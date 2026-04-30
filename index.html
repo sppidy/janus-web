@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEON.TRADER // web</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline"></div>
+
+  <!-- LOGIN -->
+  <section id="login" class="login">
+    <div class="login-card">
+      <div class="brand">
+        <span class="brand-text">NEON</span><span class="brand-dot"></span><span class="brand-sub">TRADER</span>
+      </div>
+      <div class="login-tag">// authenticate to continue</div>
+      <form id="login-form">
+        <label class="field">
+          <span>API KEY</span>
+          <input id="api-key-input" type="password" placeholder="xxxxxxxxxxxxxxxx" autocomplete="off" />
+        </label>
+        <button type="submit" class="btn btn-primary" id="login-btn">CONNECT</button>
+      </form>
+      <div id="login-error" class="login-error" hidden></div>
+    </div>
+  </section>
+
+  <!-- APP SHELL -->
+  <main id="app" class="app" hidden>
+    <aside class="sidebar">
+      <div class="brand small">
+        <span class="brand-text">NEON</span><span class="brand-dot"></span>
+      </div>
+      <nav id="nav" class="nav"></nav>
+      <div class="sidebar-foot">
+        <div class="pill" id="conn-pill"><span class="dot"></span><span>OFFLINE</span></div>
+        <div class="pill" id="regime-pill"><span>REGIME</span><b id="regime-val">—</b></div>
+        <button id="logout-btn" class="btn btn-ghost" type="button">DISCONNECT</button>
+      </div>
+    </aside>
+
+    <section class="content">
+      <header class="topbar">
+        <div class="crumbs">
+          <span>//</span><span id="crumb-section">DASHBOARD</span>
+        </div>
+        <div class="ticker" id="ticker"></div>
+        <div class="clock" id="clock">--:--:--</div>
+      </header>
+
+      <div id="view" class="view"></div>
+    </section>
+  </main>
+
+  <template id="tpl-dashboard">
+    <div class="grid dash">
+      <div class="card kpi">
+        <div class="card-label">TOTAL VALUE</div>
+        <div class="kpi-value" data-bind="totalValue">—</div>
+        <div class="kpi-sub">CASH <b data-bind="cash">—</b></div>
+      </div>
+      <div class="card kpi">
+        <div class="card-label">RETURN</div>
+        <div class="kpi-value" data-bind="returnPct">—</div>
+        <div class="kpi-sub">REALIZED <b data-bind="realized">—</b></div>
+      </div>
+      <div class="card kpi">
+        <div class="card-label">POSITIONS</div>
+        <div class="kpi-value" data-bind="posCount">—</div>
+        <div class="kpi-sub">PORTFOLIO <b data-bind="portfolio">main</b></div>
+      </div>
+      <div class="card kpi">
+        <div class="card-label">AUTOPILOT</div>
+        <div class="kpi-value small" data-bind="autoState">—</div>
+        <div class="kpi-sub">
+          <button class="btn btn-xs" data-action="auto-start">START</button>
+          <button class="btn btn-xs btn-ghost" data-action="auto-stop">STOP</button>
+        </div>
+      </div>
+
+      <div class="card span-2">
+        <div class="card-header">
+          <div class="card-label">OPEN POSITIONS</div>
+          <span class="tag" data-bind="posCountTag">0</span>
+        </div>
+        <table class="table">
+          <thead><tr><th>SYM</th><th>QTY</th><th>AVG</th><th>LAST</th><th>P&amp;L</th><th>%</th></tr></thead>
+          <tbody data-bind="positionsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card span-2">
+        <div class="card-header">
+          <div class="card-label">RECENT TRADES</div>
+        </div>
+        <table class="table">
+          <thead><tr><th>TIME</th><th>SIDE</th><th>SYM</th><th>QTY</th><th>PRICE</th><th>P&amp;L</th></tr></thead>
+          <tbody data-bind="tradesBody"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </template>
+
+  <template id="tpl-watchlist">
+    <div class="grid">
+      <div class="card span-4">
+        <div class="card-header">
+          <div class="card-label">WATCHLIST</div>
+          <span class="muted" id="wl-count">—</span>
+        </div>
+        <div class="watchlist" id="wl-grid"></div>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-chart">
+    <div class="grid chart-grid">
+      <div class="card span-4">
+        <div class="card-header">
+          <div class="card-label">CHARTS</div>
+          <div class="chart-controls">
+            <div class="search-wrap">
+              <input id="chart-symbol" type="text" placeholder="type symbol (e.g. TATASTEEL.NS)" autocomplete="off" spellcheck="false" />
+              <div id="chart-suggest" class="suggest" hidden></div>
+            </div>
+            <div class="tf-group" id="tf-group">
+              <button data-tf="5m">5m</button>
+              <button data-tf="15m">15m</button>
+              <button data-tf="1h" class="active">1h</button>
+              <button data-tf="1d">1d</button>
+            </div>
+          </div>
+        </div>
+        <div class="ind-bar" id="ind-bar">
+          <button data-ind="ma20">MA20</button>
+          <button data-ind="ema50">EMA50</button>
+          <button data-ind="bb">BB</button>
+          <button data-ind="vol" class="active">VOL</button>
+          <button data-ind="rsi" class="active">RSI</button>
+          <span class="zoom-hint">scroll to zoom · drag to pan</span>
+          <button class="btn btn-xs" data-action="chart-reset">RESET</button>
+        </div>
+        <div class="chart-wrap" id="chart-wrap">
+          <div id="chart-main" class="chart-pane"></div>
+          <div id="chart-sub" class="chart-pane chart-sub"></div>
+          <div class="chart-legend" id="chart-legend">—</div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-strategy">
+    <div class="grid strategy">
+      <div class="card span-2">
+        <div class="card-header">
+          <div class="card-label">STRATEGY // RULES</div>
+          <div class="row-gap">
+            <button class="btn btn-xs" data-action="strat-add">+ RULE</button>
+            <button class="btn btn-xs btn-ghost" data-action="strat-clear">CLEAR</button>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="row-gap" style="gap:6px">
+            <label class="field" style="flex:1">
+              <span>NAME</span>
+              <input id="strat-name" placeholder="my strategy" />
+            </label>
+            <label class="field" style="width:180px">
+              <span>TEMPLATE</span>
+              <select id="strat-template">
+                <option value="">— none —</option>
+                <option value="ema_cross">EMA CROSS</option>
+                <option value="rsi_mr">RSI MEAN REV</option>
+                <option value="bb_breakout">BB BREAKOUT</option>
+                <option value="sma_trend">SMA TREND</option>
+              </select>
+            </label>
+          </div>
+          <div id="strat-rules" class="strat-rules"></div>
+          <div class="row-gap">
+            <label class="field" style="flex:1">
+              <span>SYMBOL</span>
+              <input id="strat-symbol" placeholder="TATASTEEL.NS" />
+            </label>
+            <label class="field" style="width:120px">
+              <span>TF</span>
+              <select id="strat-tf">
+                <option>5m</option><option>15m</option><option selected>1h</option><option>1d</option>
+              </select>
+            </label>
+          </div>
+          <div class="row-gap">
+            <button class="btn btn-xs btn-primary" data-action="strat-backtest">RUN BACKTEST</button>
+            <button class="btn btn-xs" data-action="strat-save">SAVE</button>
+            <button class="btn btn-xs" data-action="strat-load">LOAD</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card span-2">
+        <div class="card-header">
+          <div class="card-label">SETTINGS</div>
+        </div>
+        <div class="settings-grid">
+          <label class="field"><span>INITIAL CAPITAL</span><input id="strat-capital" type="number" value="100000" /></label>
+          <label class="field"><span>POSITION SIZE %</span><input id="strat-pos" type="number" value="100" min="1" max="100" /></label>
+          <label class="field"><span>COMMISSION %</span><input id="strat-fee" type="number" value="0.05" step="0.01" /></label>
+          <label class="field"><span>STOP LOSS %</span><input id="strat-sl" type="number" value="3" step="0.1" /></label>
+          <label class="field"><span>TAKE PROFIT %</span><input id="strat-tp" type="number" value="6" step="0.1" /></label>
+          <label class="field"><span>SLIPPAGE %</span><input id="strat-slip" type="number" value="0.03" step="0.01" /></label>
+        </div>
+      </div>
+
+      <div class="card span-4">
+        <div class="card-header">
+          <div class="card-label">AI // GENERATE</div>
+          <span class="muted" id="strat-ai-state">idle</span>
+        </div>
+        <div class="stack">
+          <div class="row-gap">
+            <textarea id="strat-ai-prompt" rows="2" style="flex:1" placeholder="describe a strategy — e.g. 'mean-reversion on oversold RSI in uptrends'"></textarea>
+            <button class="btn btn-xs btn-primary" data-action="strat-ai-gen">GENERATE</button>
+          </div>
+          <pre id="strat-ai-out" class="ai-out muted" hidden></pre>
+        </div>
+      </div>
+
+      <div class="card span-4">
+        <div class="card-header">
+          <div class="card-label">PRICE + SIGNALS</div>
+          <span class="muted" id="strat-bt-state">run a backtest to see signals</span>
+        </div>
+        <div class="chart-wrap strat-chart" id="strat-chart-wrap">
+          <div id="strat-chart-main" class="chart-pane"></div>
+          <div id="strat-chart-sub" class="chart-pane chart-sub"></div>
+          <div class="chart-legend" id="strat-chart-legend">—</div>
+        </div>
+      </div>
+
+      <div class="card span-4">
+        <div class="card-header">
+          <div class="card-label">PERFORMANCE</div>
+        </div>
+        <div id="strat-bt-kpis" class="bt-kpis"></div>
+      </div>
+
+      <div class="card span-4">
+        <div class="card-header">
+          <div class="card-label">TRADE LIST</div>
+          <span class="muted" id="strat-bt-count">—</span>
+        </div>
+        <table class="table">
+          <thead><tr><th>#</th><th>ENTRY TIME</th><th>EXIT TIME</th><th>SIDE</th><th>ENTRY</th><th>EXIT</th><th>PNL</th><th>PNL%</th><th>BARS</th><th>EXIT RSN</th></tr></thead>
+          <tbody id="strat-bt-body"><tr><td colspan="10" class="muted">run a backtest to populate</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-scanner">
+    <div class="grid scanner">
+      <div class="card span-4">
+        <div class="card-header">
+          <div class="card-label">SCANNER</div>
+          <div class="row-gap">
+            <button class="btn btn-xs" data-action="scan-rules">RULE SCAN</button>
+            <button class="btn btn-xs btn-primary" data-action="scan-ai">AI SCAN</button>
+            <span class="muted" id="scan-state">idle</span>
+          </div>
+        </div>
+        <table class="table">
+          <thead><tr><th>SYM</th><th>SIGNAL</th><th>PRICE</th><th>CONF</th><th>SL</th><th>TGT</th><th>REASON</th></tr></thead>
+          <tbody id="scan-body"><tr><td colspan="7" class="muted">run a scan to populate</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-agent">
+    <div class="grid agent">
+      <div class="card span-4 agent-card">
+        <div class="card-header">
+          <div class="card-label">AGENT // CHAT</div>
+          <span class="muted" id="chat-state">ready</span>
+        </div>
+        <div class="chat" id="chat-log"></div>
+        <form class="chat-input" id="chat-form">
+          <input id="chat-input" placeholder="ask the agent or type BUY/SELL SYMBOL..." autocomplete="off" />
+          <button type="submit" class="btn btn-primary">SEND</button>
+        </form>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-logs">
+    <div class="grid">
+      <div class="card span-4">
+        <div class="card-header">
+          <div class="card-label">LIVE LOGS</div>
+          <div class="row-gap">
+            <span id="ws-state" class="pill"><span class="dot"></span><span>DISCONNECTED</span></span>
+            <button class="btn btn-xs btn-ghost" data-action="logs-clear">CLEAR</button>
+          </div>
+        </div>
+        <pre id="log-stream" class="log-stream"></pre>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-settings">
+    <div class="grid">
+      <div class="card span-2">
+        <div class="card-header"><div class="card-label">CONNECTION</div></div>
+        <div class="stack">
+          <label class="field">
+            <span>API KEY</span>
+            <input id="settings-key" type="password" />
+          </label>
+          <div class="row-gap">
+            <button class="btn btn-xs btn-primary" data-action="save-key">SAVE &amp; RECONNECT</button>
+            <button class="btn btn-xs btn-ghost" data-action="clear-key">CLEAR</button>
+          </div>
+          <div class="muted small" id="settings-status">—</div>
+        </div>
+      </div>
+      <div class="card span-2">
+        <div class="card-header"><div class="card-label">ACCENT</div></div>
+        <div class="accents" id="accents">
+          <button data-accent="lime" style="--c:#b4ff00">LIME</button>
+          <button data-accent="cyan" style="--c:#00f0ff">CYAN</button>
+          <button data-accent="magenta" style="--c:#ff00aa">MAGENTA</button>
+          <button data-accent="amber" style="--c:#ffb300">AMBER</button>
+        </div>
+      </div>
+      <div class="card span-4">
+        <div class="card-header"><div class="card-label">ABOUT</div></div>
+        <div class="stack small muted">
+          <div>NEON.TRADER web client — vanilla JS, zero build.</div>
+          <div>API: <code id="about-api">/api</code></div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="lightweight-charts.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
