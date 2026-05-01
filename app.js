@@ -1,4 +1,4 @@
-// NEON.TRADER // web — vanilla JS client
+// Janus // web — vanilla JS client
 // API: FastAPI backend served on same origin (or CORS-enabled over VPN).
 
 (() => {
@@ -37,8 +37,8 @@
 
   // ── State ──
   const state = {
-    apiKey: localStorage.getItem("neon_api_key") || "",
-    accent: localStorage.getItem("neon_accent") || "lime",
+    apiKey: localStorage.getItem("janus_api_key") || "",
+    accent: localStorage.getItem("janus_accent") || "lime",
     view: "dash",
     status: null,
     prices: {},
@@ -81,7 +81,7 @@
     );
     const res = await fetch(API_BASE + path, { ...opts, headers });
     if (res.status === 401) {
-      localStorage.removeItem("neon_api_key");
+      localStorage.removeItem("janus_api_key");
       state.apiKey = "";
       showLogin("Session expired — re-enter API key.");
       throw new Error("unauthorized");
@@ -122,7 +122,7 @@
       state.apiKey = key;
       const s = await api("/status");
       if (s.status === "ok") {
-        localStorage.setItem("neon_api_key", key);
+        localStorage.setItem("janus_api_key", key);
         showApp();
         await init();
       } else {
@@ -137,7 +137,7 @@
   });
 
   $("#logout-btn").addEventListener("click", () => {
-    localStorage.removeItem("neon_api_key");
+    localStorage.removeItem("janus_api_key");
     state.apiKey = "";
     closeWs();
     showLogin();
@@ -1479,7 +1479,7 @@ Only output the JSON. No prose, no markdown, no code fences.`;
       state.apiKey = k;
       try {
         await api("/status");
-        localStorage.setItem("neon_api_key", k);
+        localStorage.setItem("janus_api_key", k);
         $("#settings-status").textContent = "OK — reconnected.";
         toast("API key saved");
         refreshStatus();
@@ -1490,7 +1490,7 @@ Only output the JSON. No prose, no markdown, no code fences.`;
       }
     };
     $('[data-action="clear-key"]').onclick = () => {
-      localStorage.removeItem("neon_api_key");
+      localStorage.removeItem("janus_api_key");
       state.apiKey = "";
       closeWs();
       showLogin();
@@ -1507,7 +1507,7 @@ Only output the JSON. No prose, no markdown, no code fences.`;
     r.setProperty("--neon-glow", a.glow);
     r.setProperty("--neon-soft", a.soft);
     r.setProperty("--border-hot", a.neon.replace(")", ", 0.35)").replace("rgb", "rgba")); // best-effort
-    localStorage.setItem("neon_accent", name);
+    localStorage.setItem("janus_accent", name);
     state.accent = name;
   }
 

@@ -1,6 +1,6 @@
 # aitrader-web
 
-Web dashboard for the AI Trading Agent. Part of [`trading-agent`](https://github.com/sppidy/trading-agent).
+Web dashboard for the Janus. Part of [`janus`](https://github.com/sppidy/janus).
 
 - Vanilla JavaScript, **no build step**
 - TradingView `lightweight-charts` vendored locally
@@ -35,4 +35,4 @@ Dashboard · Watchlist · Charts (candle + indicator toggles + RSI sub-pane) · 
 
 ## License
 
-[Apache-2.0](LICENSE). Contributing guidelines and security policy live in the [super-repo](https://github.com/sppidy/trading-agent).
+[Apache-2.0](LICENSE). Contributing guidelines and security policy live in the [super-repo](https://github.com/sppidy/janus).
