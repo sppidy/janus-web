@@ -762,13 +762,19 @@
   function openWs() {
     if (!state.apiKey) return;
     closeWs();
-    const url = `${WS_BASE}/ws/logs?token=${encodeURIComponent(state.apiKey)}`;
+    // Auth via first-message rather than ?token= query string. Keeps the API
+    // key out of reverse-proxy access logs and any URL-capturing telemetry.
+    const url = `${WS_BASE}/ws/logs`;
     let ws;
     try { ws = new WebSocket(url); } catch { return; }
     state.ws = ws;
     updateWsPill(false, "CONNECTING");
 
-    ws.onopen = () => updateWsPill(true, "LIVE");
+    ws.onopen = () => {
+      // Send auth as the very first frame, then mark LIVE on first server msg.
+      try { ws.send(JSON.stringify({ type: "auth", key: state.apiKey })); } catch {}
+      updateWsPill(true, "LIVE");
+    };
     ws.onclose = () => {
       updateWsPill(false, "DISCONNECTED");
       if (state.view === "logs" && state.apiKey) {
