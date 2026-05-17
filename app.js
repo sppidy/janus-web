@@ -874,10 +874,10 @@
     rules: [],
     symbol: "",
     tf: "1h",
-    settings: { capital: 100000, pos: 100, fee: 0.05, sl: 3, tp: 6, slip: 0.03 },
+    settings: { capital: 10000000, pos: 100, fee: 0.05, sl: 3, tp: 6, slip: 0.03 },
   };
   if (!state.strategy.settings) {
-    state.strategy.settings = { capital: 100000, pos: 100, fee: 0.05, sl: 3, tp: 6, slip: 0.03 };
+    state.strategy.settings = { capital: 10000000, pos: 100, fee: 0.05, sl: 3, tp: 6, slip: 0.03 };
   }
 
   const _stratChart = {
@@ -1177,7 +1177,7 @@
     const slPct    = (settings.sl   || 0) / 100;
     const tpPct    = (settings.tp   || 0) / 100;
     const posPct   = (settings.pos  || 100) / 100;
-    const capital0 = Number(settings.capital) || 100000;
+    const capital0 = Number(settings.capital) || 10000000;
 
     bt.textContent = "loading candles...";
     body.innerHTML = `<tr><td colspan="10" class="muted">loading...</td></tr>`;
