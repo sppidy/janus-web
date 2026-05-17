@@ -35,6 +35,12 @@
     { id: "set",     label: "SETTINGS" },
   ];
 
+  // Migrate legacy localStorage keys
+  if (localStorage.getItem("neon_strategy") && !localStorage.getItem("janus_strategy")) {
+    localStorage.setItem("janus_strategy", localStorage.getItem("neon_strategy"));
+    localStorage.removeItem("neon_strategy");
+  }
+
   // ── State ──
   const state = {
     apiKey: localStorage.getItem("janus_api_key") || "",
@@ -50,6 +56,18 @@
     chartSymbol: "",
     chartTf: "1h",
     pollers: [],
+  };
+
+  const CHART_OPTS = {
+    layout: { background: { color: "#10141d" }, textColor: "#7a8a7e", fontFamily: "JetBrains Mono, ui-monospace, monospace", fontSize: 10 },
+    grid: { vertLines: { color: "rgba(180,255,0,0.04)" }, horzLines: { color: "rgba(180,255,0,0.04)" } },
+    rightPriceScale: { borderColor: "#1e2730" },
+    timeScale: { borderColor: "#1e2730", timeVisible: true, secondsVisible: false },
+    crosshair: {
+      mode: 1,
+      vertLine: { color: "#b4ff00", width: 1, style: 2, labelBackgroundColor: "#161c26" },
+      horzLine: { color: "#b4ff00", width: 1, style: 2, labelBackgroundColor: "#161c26" },
+    },
   };
 
   // ── Utilities ──
@@ -282,7 +300,7 @@
 
   async function autopilotControl(action) {
     try {
-      const body = action === "start" ? JSON.stringify({}) : JSON.stringify({});
+      const body = JSON.stringify({});
       await api(`/autopilot/${action}`, { method: "POST", body });
       toast(`Autopilot ${action.toUpperCase()} ok`);
       refreshStatus();
@@ -433,25 +451,7 @@
     if (_chart.sub)  { try { _chart.sub.remove();  } catch {} _chart.sub  = null; }
     main.innerHTML = ""; sub.innerHTML = "";
 
-    const commonOpts = {
-      layout: {
-        background: { color: "#10141d" },
-        textColor: "#7a8a7e",
-        fontFamily: "JetBrains Mono, ui-monospace, monospace",
-        fontSize: 10,
-      },
-      grid: {
-        vertLines: { color: "rgba(180,255,0,0.04)" },
-        horzLines: { color: "rgba(180,255,0,0.04)" },
-      },
-      rightPriceScale: { borderColor: "#1e2730" },
-      timeScale: { borderColor: "#1e2730", timeVisible: true, secondsVisible: false },
-      crosshair: {
-        mode: 1,
-        vertLine: { color: "#b4ff00", width: 1, style: 2, labelBackgroundColor: "#161c26" },
-        horzLine: { color: "#b4ff00", width: 1, style: 2, labelBackgroundColor: "#161c26" },
-      },
-    };
+    const commonOpts = CHART_OPTS;
 
     _chart.main = LightweightCharts.createChart(main, {
       ...commonOpts,
@@ -486,14 +486,14 @@
 
     // Sync time scales between main + sub panes
     const syncing = { val: false };
-    const sync = (a, b) => (range) => {
+    const sync = (dst) => (range) => {
       if (syncing.val || !range) return;
       syncing.val = true;
-      try { b.timeScale().setVisibleLogicalRange(range); } catch {}
+      try { dst.timeScale().setVisibleLogicalRange(range); } catch {}
       syncing.val = false;
     };
-    _chart.main.timeScale().subscribeVisibleLogicalRangeChange(sync(_chart.main, _chart.sub));
-    _chart.sub.timeScale().subscribeVisibleLogicalRangeChange(sync(_chart.sub, _chart.main));
+    _chart.main.timeScale().subscribeVisibleLogicalRangeChange(sync(_chart.sub));
+    _chart.sub.timeScale().subscribeVisibleLogicalRangeChange(sync(_chart.main));
 
     // Crosshair legend
     _chart.main.subscribeCrosshairMove((param) => {
@@ -625,8 +625,10 @@
 
   // ── Scanner ──
   function mountScanner() {
-    $('[data-action="scan-rules"]').onclick = () => runScan(false);
-    $('[data-action="scan-ai"]').onclick = () => runScan(true);
+    const rules = $('[data-action="scan-rules"]');
+    const ai = $('[data-action="scan-ai"]');
+    if (rules) rules.onclick = () => runScan(false);
+    if (ai) ai.onclick = () => runScan(true);
   }
 
   async function runScan(useAI) {
@@ -646,8 +648,10 @@
       stateEl.textContent = `ai scan job ${jobId.slice(0, 8)}...`;
       // poll
       const deadline = Date.now() + 180_000;
+      const startView = state.view;
       while (Date.now() < deadline) {
         await sleep(2500);
+        if (state.view !== startView) return;
         const job = await api(`/scan/status/${jobId}`);
         if (job.status === "completed") {
           renderSignals(job.signals || []);
@@ -717,8 +721,10 @@
         });
         const jobId = start.job_id;
         const deadline = Date.now() + 300_000;
+        const startView = state.view;
         while (Date.now() < deadline) {
           await sleep(2000);
+          if (state.view !== startView) return;
           const job = await api(`/chat/status/${jobId}`);
           if (job.status === "completed") {
             pushMsg({ role: "assistant", content: job.reply || "(no reply)" });
@@ -747,6 +753,7 @@
   }
   function pushMsg(m) {
     state.chatHistory.push({ role: m.role, content: m.content, err: !!m.err });
+    if (state.chatHistory.length > 200) state.chatHistory = state.chatHistory.slice(-100);
     const log = $("#chat-log");
     if (!log) return;
     log.insertAdjacentHTML("beforeend", renderMsg(state.chatHistory[state.chatHistory.length - 1]));
@@ -923,11 +930,11 @@
       renderStrategyRules();
     };
     $('[data-action="strat-save"]').onclick = () => {
-      localStorage.setItem("neon_strategy", JSON.stringify(state.strategy));
+      localStorage.setItem("janus_strategy", JSON.stringify(state.strategy));
       toast("Strategy saved");
     };
     $('[data-action="strat-load"]').onclick = () => {
-      const raw = localStorage.getItem("neon_strategy");
+      const raw = localStorage.getItem("janus_strategy");
       if (!raw) return toast("no saved strategy", true);
       try {
         const loaded = JSON.parse(raw);
@@ -952,17 +959,7 @@
     if (_stratChart.sub)  { try { _stratChart.sub.remove();  } catch {} _stratChart.sub  = null; }
     main.innerHTML = ""; sub.innerHTML = "";
 
-    const common = {
-      layout: { background: { color: "#10141d" }, textColor: "#7a8a7e", fontFamily: "JetBrains Mono, ui-monospace, monospace", fontSize: 10 },
-      grid: { vertLines: { color: "rgba(180,255,0,0.04)" }, horzLines: { color: "rgba(180,255,0,0.04)" } },
-      rightPriceScale: { borderColor: "#1e2730" },
-      timeScale: { borderColor: "#1e2730", timeVisible: true, secondsVisible: false },
-      crosshair: {
-        mode: 1,
-        vertLine: { color: "#b4ff00", width: 1, style: 2, labelBackgroundColor: "#161c26" },
-        horzLine: { color: "#b4ff00", width: 1, style: 2, labelBackgroundColor: "#161c26" },
-      },
-    };
+    const common = CHART_OPTS;
     _stratChart.main = LightweightCharts.createChart(main, { ...common, width: main.clientWidth, height: main.clientHeight });
     _stratChart.candleSeries = _stratChart.main.addCandlestickSeries({
       upColor: "#3ddc97", downColor: "#ff4d6d",
@@ -980,14 +977,14 @@
     });
 
     const syncing = { val: false };
-    const sync = (src, dst) => (range) => {
+    const sync = (dst) => (range) => {
       if (syncing.val || !range) return;
       syncing.val = true;
       try { dst.timeScale().setVisibleLogicalRange(range); } catch {}
       syncing.val = false;
     };
-    _stratChart.main.timeScale().subscribeVisibleLogicalRangeChange(sync(_stratChart.main, _stratChart.sub));
-    _stratChart.sub.timeScale().subscribeVisibleLogicalRangeChange(sync(_stratChart.sub, _stratChart.main));
+    _stratChart.main.timeScale().subscribeVisibleLogicalRangeChange(sync(_stratChart.sub));
+    _stratChart.sub.timeScale().subscribeVisibleLogicalRangeChange(sync(_stratChart.main));
 
     _stratChart.main.subscribeCrosshairMove((param) => {
       const leg = $("#strat-chart-legend");
@@ -1420,8 +1417,10 @@ Only output the JSON. No prose, no markdown, no code fences.`;
         body: JSON.stringify({ message: full, history: [] }),
       });
       const deadline = Date.now() + 180_000;
+      const startView = state.view;
       while (Date.now() < deadline) {
         await sleep(2000);
+        if (state.view !== startView) return;
         const job = await api(`/chat/status/${start.job_id}`);
         if (job.status === "completed") {
           const reply = (job.reply || "").trim();
@@ -1506,7 +1505,9 @@ Only output the JSON. No prose, no markdown, no code fences.`;
     r.setProperty("--neon", a.neon);
     r.setProperty("--neon-glow", a.glow);
     r.setProperty("--neon-soft", a.soft);
-    r.setProperty("--border-hot", a.neon.replace(")", ", 0.35)").replace("rgb", "rgba")); // best-effort
+    const hex = a.neon.replace("#", "");
+    const rr = parseInt(hex.substring(0, 2), 16), gg = parseInt(hex.substring(2, 4), 16), bb = parseInt(hex.substring(4, 6), 16);
+    r.setProperty("--border-hot", `rgba(${rr},${gg},${bb},0.35)`);
     localStorage.setItem("janus_accent", name);
     state.accent = name;
   }
@@ -1528,6 +1529,7 @@ Only output the JSON. No prose, no markdown, no code fences.`;
       const d = await api("/prices");
       state.prices = d.prices || {};
       if (state.view === "dash") paintDashboard();
+      if (state.view === "watch") paintWatchlist();
       paintTicker();
     } catch {}
   }
